@@ -2,6 +2,8 @@
 
 GET-gesteuerter HTTP-Makro-Proxy für KI-Systeme und Automatisierung.
 
+**Öffentliches Open-Source-Projekt** — leichtgewichtige Brücke für Umgebungen, die nur GET-Requests ausführen können (z. B. bestimmte KI-Agenten, einfache Webhooks oder Legacy-Tools).
+
 Viele KI-Agenten können nur **GET-Requests** ausführen. Dieses Projekt speichert vordefinierte HTTP-Aufrufe (POST, PUT, DELETE usw.) als **Makros** in einer SQLite-Datenbank und löst sie über einfache GET-URLs aus.
 
 ## Funktionsweise
@@ -54,7 +56,20 @@ Die Datei `api_key.php` ist nicht im Repository enthalten. Aus der Vorlage anleg
 cp api_key.php.example api_key.php
 ```
 
-Dann den API-Key in `api_key.php` anpassen.
+Dann den API-Key und die Sicherheitseinstellungen in `api_key.php` anpassen:
+
+```php
+$apiKey = 'dein-sicherer-schluessel';
+$requireHttps = true;
+$allowedDomains = ['httpbin.org', 'api.example.com'];
+$rateLimitPerMinute = 60;
+```
+
+| Einstellung | Beschreibung |
+|-------------|--------------|
+| `$requireHttps` | API-Aufrufe nur über HTTPS erlauben |
+| `$allowedDomains` | Whitelist für Ziel-URLs beim Anlegen und Ausführen von Makros |
+| `$rateLimitPerMinute` | Max. Requests pro IP und Minute (`0` = aus) |
 
 > **Hinweis:** `api_key.php` steht in der `.gitignore` und darf nicht ins Repository committed werden.
 
@@ -197,6 +212,18 @@ Tabelle `macros` in `macro_generator.db`:
 | `headers` | TEXT | HTTP-Headers (JSON) |
 | `created_at` | DATETIME | Erstellungszeitpunkt |
 
+Tabelle `execution_log` (automatisch):
+
+| Feld | Typ | Beschreibung |
+|------|-----|--------------|
+| `macro_id` | INTEGER | Ausgeführtes Makro |
+| `macro_name` | TEXT | Makro-Name |
+| `ip` | TEXT | Client-IP |
+| `http_status` | INTEGER | HTTP-Status der Ziel-API |
+| `success` | INTEGER | `1` = erfolgreich, `0` = Fehler |
+| `error` | TEXT | Fehlermeldung (falls vorhanden) |
+| `executed_at` | DATETIME | Zeitpunkt der Ausführung |
+
 ## Projektstruktur
 
 ```
@@ -211,15 +238,36 @@ GETtoPOSTforAI/
 └── README.md
 ```
 
-## Sicherheitshinweise
+## Sicherheit (öffentliche Instanzen)
 
-Dieses Projekt ist als **Proof-of-Concept** gedacht. Für den Produktionseinsatz sollten folgende Punkte beachtet werden:
+Da das Repository öffentlich ist, enthält der Code **Baseline-Schutz** für öffentlich erreichbare Installationen:
 
-- **API-Key:** Starken, einzigartigen Key verwenden und `api_key.php` niemals committen
-- **HTTPS:** API-Key und sensible Daten nur über verschlüsselte Verbindungen übertragen
-- **SSRF-Schutz:** Aktuell können beliebige URLs als Ziel gesetzt werden (inkl. interner Netzwerke). URL-Whitelist empfohlen
-- **Rate-Limiting:** Kein Schutz gegen Missbrauch vorhanden
-- **Logging:** GET-Parameter mit API-Key können in Server-Logs landen
+| Maßnahme | Status |
+|----------|--------|
+| API-Key mit `hash_equals()` | ✅ |
+| HTTPS erzwingen (`$requireHttps`) | ✅ |
+| Domain-Whitelist (`$allowedDomains`) | ✅ |
+| SSRF-Schutz (localhost, private IPs, DNS-Check) | ✅ |
+| Input-Validierung (`name`, `method`, `headers`, `url`) | ✅ |
+| Rate-Limiting pro IP | ✅ |
+| Ausführungs-Log in SQLite | ✅ |
+| cURL ohne Redirect-Follow | ✅ |
+
+### Empfehlungen für den Betrieb
+
+- **Starken API-Key** setzen und `api_key.php` niemals committen
+- **`$allowedDomains`** auf die wirklich benötigten APIs begrenzen
+- **HTTPS** aktiv lassen
+- **Server-Logs** beachten: GET-Parameter mit API-Key können in Access-Logs landen
+- **`macro_generator.db`** regelmäßig sichern (z. B. per Cronjob)
+- Instanz **nicht ungeschützt** ins Internet stellen, ohne Whitelist und Rate-Limit
+
+### Typische Anwendungsfälle
+
+- KI-Agenten ohne POST-Unterstützung
+- GET-only Webhooks als Brücke zu REST-APIs
+- Schnelles Testen und Mocken von APIs
+- Legacy-Systeme, die moderne HTTP-Methoden indirekt ansteuern
 
 ## Lizenz
 

@@ -6,6 +6,7 @@
 // ---------- Konfiguration ----------
 define('DB_FILE', __DIR__ . '/macro_generator.db');
 define('API_KEY_FILE', __DIR__ . '/api_key.php');
+define('ALLOWED_METHODS', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
 // ---------- Ausgabeformat ----------
 function wantsHtml(): bool {
@@ -273,13 +274,225 @@ function renderDeleteHtml(array $data): string {
         </div>';
 }
 
-// ---------- API-Key laden ----------
-function loadApiKey() {
+// ---------- Konfiguration laden ----------
+function loadConfig(): array {
     if (!file_exists(API_KEY_FILE)) {
         respondError('API-Key-Datei nicht gefunden', 500);
     }
-    require_once API_KEY_FILE;
-    return $apiKey;
+
+    require API_KEY_FILE;
+
+    return [
+        'apiKey' => $apiKey ?? '',
+        'requireHttps' => $requireHttps ?? true,
+        'allowedDomains' => $allowedDomains ?? [],
+        'rateLimitPerMinute' => (int) ($rateLimitPerMinute ?? 60),
+    ];
+}
+
+function clientIp(): string {
+    return $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+}
+
+function enforceHttps(array $config): void {
+    if (!$config['requireHttps']) {
+        return;
+    }
+
+    $https = $_SERVER['HTTPS'] ?? '';
+    if ($https && $https !== 'off') {
+        return;
+    }
+
+    $forwarded = strtolower($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '');
+    if ($forwarded === 'https') {
+        return;
+    }
+
+    respondError('HTTPS ist erforderlich', 403);
+}
+
+// ---------- Validierung & SSRF-Schutz ----------
+function validateMacroName(string $name): ?string {
+    if (!preg_match('/^[a-zA-Z0-9_-]{1,50}$/', $name)) {
+        return 'Ungültiger Makro-Name (erlaubt: a-z, A-Z, 0-9, _, -, max. 50 Zeichen)';
+    }
+
+    return null;
+}
+
+function validateMethod(string $method): ?string {
+    if (!in_array(strtoupper($method), ALLOWED_METHODS, true)) {
+        return 'Ungültige HTTP-Methode';
+    }
+
+    return null;
+}
+
+function validateHeaders(string $headers): ?string {
+    if ($headers === '') {
+        return null;
+    }
+
+    $decoded = json_decode($headers, true);
+    if (!is_array($decoded)) {
+        return 'headers muss ein gültiges JSON-Objekt sein';
+    }
+
+    foreach ($decoded as $key => $value) {
+        if (!is_string($key) || (!is_string($value) && !is_numeric($value))) {
+            return 'headers dürfen nur String-Schlüssel und String/Number-Werte enthalten';
+        }
+    }
+
+    return null;
+}
+
+function isBlockedHost(string $host): bool {
+    $host = strtolower(trim($host, '[]'));
+    $blockedHosts = ['localhost', 'metadata.google.internal', 'metadata.goog'];
+
+    if (in_array($host, $blockedHosts, true)) {
+        return true;
+    }
+
+    if (str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
+        return true;
+    }
+
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        return isBlockedIp($host);
+    }
+
+    return false;
+}
+
+function isBlockedIp(string $ip): bool {
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+        return true;
+    }
+
+    return filter_var(
+        $ip,
+        FILTER_VALIDATE_IP,
+        FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+    ) === false;
+}
+
+function isDomainAllowed(string $host, array $allowedDomains): bool {
+    if ($allowedDomains === []) {
+        return true;
+    }
+
+    $host = strtolower($host);
+    foreach ($allowedDomains as $domain) {
+        $domain = strtolower((string) $domain);
+        if ($host === $domain || str_ends_with($host, '.' . $domain)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function validateTargetUrl(string $url, array $config): ?string {
+    if (strlen($url) > 2048) {
+        return 'URL ist zu lang';
+    }
+
+    $parts = parse_url($url);
+    if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+        return 'Ungültige URL';
+    }
+
+    $scheme = strtolower($parts['scheme']);
+    if (!in_array($scheme, ['http', 'https'], true)) {
+        return 'Nur http/https URLs erlaubt';
+    }
+
+    if ($config['requireHttps'] && $scheme !== 'https') {
+        return 'Nur HTTPS-URLs erlaubt';
+    }
+
+    $host = strtolower($parts['host']);
+    if (isBlockedHost($host)) {
+        return 'Ziel-Host nicht erlaubt';
+    }
+
+    if (!isDomainAllowed($host, $config['allowedDomains'])) {
+        return 'Domain nicht in der Whitelist';
+    }
+
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+        if (isBlockedIp($host)) {
+            return 'Ziel-IP nicht erlaubt';
+        }
+
+        return null;
+    }
+
+    $ips = @gethostbynamel($host) ?: [];
+    if ($ips === []) {
+        return 'Ziel-Host konnte nicht aufgelöst werden';
+    }
+
+    foreach ($ips as $ip) {
+        if (isBlockedIp($ip)) {
+            return 'Ziel-Host löst auf eine nicht erlaubte IP auf';
+        }
+    }
+
+    return null;
+}
+
+function checkRateLimit(SQLite3 $db, array $config): void {
+    if ($config['rateLimitPerMinute'] <= 0) {
+        return;
+    }
+
+    $ip = clientIp();
+    $window = (int) floor(time() / 60);
+
+    $db->exec('CREATE TABLE IF NOT EXISTS rate_limits (
+        ip TEXT NOT NULL,
+        window_start INTEGER NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (ip, window_start)
+    )');
+
+    $db->exec('DELETE FROM rate_limits WHERE window_start < ' . ($window - 2));
+
+    $stmt = $db->prepare('SELECT count FROM rate_limits WHERE ip = :ip AND window_start = :window');
+    $stmt->bindValue(':ip', $ip);
+    $stmt->bindValue(':window', $window, SQLITE3_INTEGER);
+    $row = $stmt->execute()->fetchArray(SQLITE3_ASSOC);
+    $count = (int) ($row['count'] ?? 0);
+
+    if ($count >= $config['rateLimitPerMinute']) {
+        respondError('Rate-Limit überschritten. Bitte später erneut versuchen.', 429);
+    }
+
+    if ($row) {
+        $update = $db->prepare('UPDATE rate_limits SET count = count + 1 WHERE ip = :ip AND window_start = :window');
+    } else {
+        $update = $db->prepare('INSERT INTO rate_limits (ip, window_start, count) VALUES (:ip, :window, 1)');
+    }
+
+    $update->bindValue(':ip', $ip);
+    $update->bindValue(':window', $window, SQLITE3_INTEGER);
+    $update->execute();
+}
+
+function logExecution(SQLite3 $db, int $macroId, string $macroName, ?int $httpStatus, bool $success, ?string $error = null): void {
+    $stmt = $db->prepare('INSERT INTO execution_log (macro_id, macro_name, ip, http_status, success, error)
+        VALUES (:macro_id, :macro_name, :ip, :http_status, :success, :error)');
+    $stmt->bindValue(':macro_id', $macroId, SQLITE3_INTEGER);
+    $stmt->bindValue(':macro_name', $macroName);
+    $stmt->bindValue(':ip', clientIp());
+    $stmt->bindValue(':http_status', $httpStatus, $httpStatus === null ? SQLITE3_NULL : SQLITE3_INTEGER);
+    $stmt->bindValue(':success', $success ? 1 : 0, SQLITE3_INTEGER);
+    $stmt->bindValue(':error', $error);
+    $stmt->execute();
 }
 
 // ---------- SQLite initialisieren ----------
@@ -295,6 +508,16 @@ function initDB() {
             headers TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )");
+        $db->exec('CREATE TABLE IF NOT EXISTS execution_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            macro_id INTEGER,
+            macro_name TEXT,
+            ip TEXT,
+            http_status INTEGER,
+            success INTEGER NOT NULL,
+            error TEXT,
+            executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )');
         return $db;
     } catch (Exception $e) {
         respondError('Datenbankfehler: ' . $e->getMessage(), 500);
@@ -302,9 +525,8 @@ function initDB() {
 }
 
 // ---------- Authentifizierung ----------
-function auth() {
-    $apiKey = loadApiKey();
-    if (!isset($_GET['key']) || $_GET['key'] !== $apiKey) {
+function auth(array $config): void {
+    if ($config['apiKey'] === '' || !isset($_GET['key']) || !hash_equals($config['apiKey'], (string) $_GET['key'])) {
         respondError('Ungültiger oder fehlender API-Key', 401);
     }
 }
@@ -316,7 +538,9 @@ function executeMacro($macro) {
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $macro['method']);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+    curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+    curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
 
     if (!empty($macro['body'])) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, $macro['body']);
@@ -349,10 +573,13 @@ function executeMacro($macro) {
 }
 
 // ---------- Hauptlogik ----------
-auth();
+$config = loadConfig();
+enforceHttps($config);
+auth($config);
 $db = initDB();
+checkRateLimit($db, $config);
 $action = $_GET['action'] ?? '';
-$apiKey = loadApiKey();
+$apiKey = $config['apiKey'];
 
 if ($action === 'create') {
     $name = $_GET['name'] ?? '';
@@ -363,6 +590,12 @@ if ($action === 'create') {
 
     if (empty($name) || empty($url)) {
         respondError('name und url sind erforderlich');
+    }
+
+    foreach ([validateMacroName($name), validateMethod($method), validateTargetUrl($url, $config), validateHeaders($headers)] as $validationError) {
+        if ($validationError !== null) {
+            respondError($validationError);
+        }
     }
 
     try {
@@ -404,7 +637,23 @@ if ($action === 'run') {
             respondError('Makro nicht gefunden', 404);
         }
 
+        $urlError = validateTargetUrl($macro['url'], $config);
+        if ($urlError !== null) {
+            logExecution($db, $id, $macro['name'], null, false, $urlError);
+            respondError($urlError);
+        }
+
         $output = executeMacro($macro);
+        $success = !isset($output['error']);
+        logExecution(
+            $db,
+            $id,
+            $macro['name'],
+            isset($output['status']) ? (int) $output['status'] : null,
+            $success,
+            $output['error'] ?? null
+        );
+
         respondData([
             'success' => true,
             'macro' => $macro['name'],

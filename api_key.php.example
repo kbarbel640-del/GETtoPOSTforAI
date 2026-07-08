@@ -1,5 +1,17 @@
 <?php
-// API-Key
-// Diese Datei nach api_key.php kopieren und den Schlüssel anpassen:
+// API-Key und Sicherheitskonfiguration
+// Diese Datei nach api_key.php kopieren und anpassen:
 //   cp api_key.php.example api_key.php
+
 $apiKey = 'dein-sicherer-schluessel';
+
+// HTTPS für alle API-Aufrufe erzwingen (empfohlen für öffentliche Instanzen)
+$requireHttps = true;
+
+// Erlaubte Ziel-Domains für Makro-URLs (SSRF-Schutz)
+// Leeres Array = keine Domain-Whitelist, aber private/localhost-Hosts bleiben blockiert
+// Beispiel: ['httpbin.org', 'api.example.com']
+$allowedDomains = ['httpbin.org'];
+
+// Rate-Limit pro IP und Minute (0 = deaktiviert)
+$rateLimitPerMinute = 60;
