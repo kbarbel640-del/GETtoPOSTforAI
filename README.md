@@ -29,6 +29,23 @@ cd GETtoPOSTforAI
 
 Dateien in das Webroot-Verzeichnis legen (z. B. `/var/www/html/GETtoPOSTforAI/`).
 
+### Apache mit Reverse-Proxy
+
+Wenn Apache Anfragen an ein Backend weiterleitet (z. B. `ProxyPass / http://localhost:8000/`), muss `/GETtoPOSTforAI/` davon ausgenommen werden, damit PHP direkt aus dem Webroot ausgeliefert wird:
+
+```apache
+ProxyPass /GETtoPOSTforAI/ !
+```
+
+Eine vollständige Snippet-Datei liegt unter `deploy/apache-proxy-snippet.conf`.
+
+Das Verzeichnis muss für den Webserver beschreibbar sein, damit SQLite `macro_generator.db` anlegen kann:
+
+```bash
+chown www-data:www-data /var/www/html/GETtoPOSTforAI
+chmod 775 /var/www/html/GETtoPOSTforAI
+```
+
 ### API-Key einrichten
 
 Die Datei `api_key.php` ist nicht im Repository enthalten. Aus der Vorlage anlegen:
@@ -156,10 +173,12 @@ Tabelle `macros` in `macro_generator.db`:
 
 ```
 GETtoPOSTforAI/
-├── macro_generator.php   # Hauptanwendung (API + cURL-Proxy)
-├── api_key.php.example   # Vorlage für den API-Key
-├── api_key.php           # API-Key (lokal, nicht im Repo)
-├── macro_generator.db    # SQLite-Datenbank (zur Laufzeit)
+├── macro_generator.php          # Hauptanwendung (API + cURL-Proxy)
+├── api_key.php.example          # Vorlage für den API-Key
+├── api_key.php                  # API-Key (lokal, nicht im Repo)
+├── macro_generator.db           # SQLite-Datenbank (zur Laufzeit)
+├── deploy/
+│   └── apache-proxy-snippet.conf
 ├── .gitignore
 └── README.md
 ```
