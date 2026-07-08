@@ -70,7 +70,32 @@ Alle Aktionen werden per **GET** mit dem Parameter `key` (API-Key) aufgerufen.
 | `run` | `id`, `key` | Makro ausführen |
 | `list` | `key` | Alle Makros auflisten |
 | `delete` | `id`, `key` | Makro löschen |
-| `help` | `key` | HTML-Hilfeseite |
+| `help` | `key` | Hilfeseite |
+
+### Ausgabeformat (`format`)
+
+| Wert | Verhalten |
+|------|-----------|
+| `json` | JSON-Antwort mit `Content-Type: application/json` |
+| `html` | Lesbare HTML-Seite mit `Content-Type: text/html` |
+| *(nicht gesetzt)* | `create`, `run`, `list`, `delete` → JSON; `help` → HTML |
+
+Beispiele:
+
+```
+GET ?action=list&key=DEIN_KEY
+GET ?action=list&format=html&key=DEIN_KEY
+GET ?action=run&id=1&format=html&key=DEIN_KEY
+GET ?action=help&format=json&key=DEIN_KEY
+```
+
+Bei `action=run` mit `format=html`:
+
+- Metadaten des Makros werden als Tabelle dargestellt
+- JSON-Antworten der Ziel-API werden formatiert angezeigt
+- HTML-Antworten der Ziel-API werden in einer sandboxed Vorschau plus Quelltext-Block gerendert
+
+Fehlerantworten respektieren ebenfalls `format=html` oder `format=json`.
 
 ### Makro anlegen
 
@@ -100,9 +125,10 @@ GET ?action=create&name=test&method=POST&url=https://httpbin.org/post&body={"foo
 
 ```
 GET ?action=run&id=1&key=DEIN_KEY
+GET ?action=run&id=1&format=html&key=DEIN_KEY
 ```
 
-**Antwort (Erfolg):**
+**Antwort (Erfolg, JSON):**
 
 ```json
 {
@@ -116,6 +142,8 @@ GET ?action=run&id=1&key=DEIN_KEY
   }
 }
 ```
+
+**Antwort (Erfolg, HTML):** HTML-Seite mit Makro-Details, HTTP-Status und formatiertem Antwortinhalt. Liefert die Ziel-API HTML, erscheint eine sandboxed Vorschau.
 
 ### Makros auflisten
 
