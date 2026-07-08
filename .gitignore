@@ -1,0 +1,21 @@
+# API-Key (lokal anlegen, nicht committen)
+api_key.php
+
+# SQLite-Datenbank (wird zur Laufzeit erzeugt)
+macro_generator.db
+*.db
+
+# Umgebungsvariablen
+.env
+.env.*
+
+# Betriebssystem
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
