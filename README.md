@@ -220,6 +220,28 @@ GET ?action=list&key=YOUR_KEY
 }
 ```
 
+### Admin dashboard (`dashboard.php`)
+
+Human-friendly admin UI that uses **POST** (unlike the GET-only macro API for AI agents).
+
+Open:
+
+```
+https://your-host/GETtoPOSTforAI/dashboard.php
+```
+
+Sign in with the same API key from `api_key.php`. Features:
+
+| Feature | Method | Description |
+|---------|--------|-------------|
+| Stats | GET | Macro count, executions, success rate, recent runs |
+| Export macros | POST | Download macros as JSON |
+| Export database | POST | Download `macro_generator.db` |
+| Import macros | POST | Upload JSON backup (`merge` or `replace`) |
+| Purge logs | POST | Delete old `execution_log` entries |
+
+All POST actions use CSRF protection and require an authenticated session.
+
 ### Delete a macro
 
 ```
@@ -266,6 +288,9 @@ Table `execution_log` (created automatically):
 ```
 GETtoPOSTforAI/
 ├── macro_generator.php          # Main application (API + cURL proxy)
+├── dashboard.php                # Admin dashboard (POST, stats, backup)
+├── includes/
+│   └── common.php               # Shared validation/helpers
 ├── api_key.php.example          # API key and security template
 ├── api_key.php                  # Local config (not in repo)
 ├── macro_generator.db           # SQLite database (runtime)

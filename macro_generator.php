@@ -154,6 +154,7 @@ function renderHelpPage(): string {
         <code>?action=run&amp;id=1&amp;format=html&amp;key=' . $key . '</code></p>
         <div class="actions">
             <a href="?action=list&amp;format=html&amp;key=' . $navKey . '">View macros</a>
+            <a href="dashboard.php">Admin dashboard</a>
         </div>';
 }
 

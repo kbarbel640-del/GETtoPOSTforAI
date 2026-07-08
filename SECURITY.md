@@ -77,4 +77,10 @@ This project is a pragmatic bridge for GET-only environments, not a full API gat
 - DNS resolution uses PHP `gethostbynamel()` without a custom timeout
 - `body` and `headers` are limited to 64 KB each; very large GET URLs may still hit web server limits
 
+### Dashboard
+
+- `dashboard.php` uses session-based authentication with the same global API key
+- All mutating actions require POST and a CSRF token
+- Database downloads expose the full SQLite file — protect dashboard access accordingly
+
 Contributions that improve safe defaults for public deployments are welcome.
