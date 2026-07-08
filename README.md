@@ -13,8 +13,9 @@ Client / AI agent (GET)  →  macro_generator.php  →  SQLite  →  cURL  →  
 ```
 
 1. Create a macro via GET (`action=create`)
-2. Execute a macro via GET (`action=run`) — the server performs the stored HTTP request
-3. List or delete macros
+2. Update a macro via GET (`action=update`)
+3. Execute a macro via GET (`action=run`) — the server performs the stored HTTP request
+4. List or delete macros
 
 ## Requirements
 
@@ -82,6 +83,7 @@ All actions are called via **GET** with the `key` parameter (API key).
 | Action | Parameters | Description |
 |--------|------------|-------------|
 | `create` | `name`, `url`, `method`, `body`, `headers`, `key` | Create a macro |
+| `update` | `id`, `name`, `url`, `method`, `body`, `headers`, `key` | Update a macro |
 | `run` | `id`, `key` | Execute a macro |
 | `list` | `key` | List all macros |
 | `delete` | `id`, `key` | Delete a macro |
@@ -93,7 +95,7 @@ All actions are called via **GET** with the `key` parameter (API key).
 |-------|----------|
 | `json` | JSON response with `Content-Type: application/json` |
 | `html` | Readable HTML page with `Content-Type: text/html` |
-| *(not set)* | `create`, `run`, `list`, `delete` → JSON; `help` → HTML |
+| *(not set)* | `create`, `update`, `run`, `list`, `delete` → JSON; `help` → HTML |
 
 Examples:
 
@@ -133,6 +135,41 @@ GET ?action=create&name=test&method=POST&url=https://httpbin.org/post&body={"foo
   "success": true,
   "id": 1,
   "message": "Macro 'test' created"
+}
+```
+
+### Update a macro
+
+```
+GET ?action=update&id=1&name=test-v2&url=https://httpbin.org/post&key=YOUR_KEY
+GET ?action=update&id=1&method=PUT&body={"foo":"baz"}&key=YOUR_KEY
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `id` | yes | Macro ID |
+| `name` | no* | New macro name |
+| `url` | no* | New target URL |
+| `method` | no* | New HTTP method |
+| `body` | no* | New request body |
+| `headers` | no* | New HTTP headers as JSON string |
+
+\* At least one of `name`, `url`, `method`, `body`, or `headers` must be provided. Omitted fields keep their existing values.
+
+**Response (success):**
+
+```json
+{
+  "success": true,
+  "message": "Macro 1 updated",
+  "macro": {
+    "id": 1,
+    "name": "test-v2",
+    "method": "POST",
+    "url": "https://httpbin.org/post",
+    "body": "{\"foo\":\"bar\"}",
+    "headers": "{}"
+  }
 }
 ```
 

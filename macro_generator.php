@@ -131,13 +131,14 @@ function renderHelpPage(): string {
         <h2>GET endpoints</h2>
         <ul>
             <li><code>?action=create&amp;name=NAME&amp;method=POST&amp;url=...&amp;body=...&amp;headers=...&amp;key=' . $key . '</code> – Create macro</li>
+            <li><code>?action=update&amp;id=123&amp;name=NAME&amp;url=...&amp;key=' . $key . '</code> – Update macro</li>
             <li><code>?action=run&amp;id=123&amp;key=' . $key . '</code> – Execute macro</li>
             <li><code>?action=list&amp;key=' . $key . '</code> – List macros</li>
             <li><code>?action=delete&amp;id=123&amp;key=' . $key . '</code> – Delete macro</li>
             <li><code>?action=help&amp;key=' . $key . '</code> – This help page</li>
         </ul>
         <h2>Output format</h2>
-        <p>With <code>format=html</code>, all actions return a readable HTML page. By default, <code>create</code>, <code>run</code>, <code>list</code>, and <code>delete</code> respond as JSON. <code>help</code> defaults to HTML.</p>
+        <p>With <code>format=html</code>, all actions return a readable HTML page. By default, <code>create</code>, <code>update</code>, <code>run</code>, <code>list</code>, and <code>delete</code> respond as JSON. <code>help</code> defaults to HTML.</p>
         <ul>
             <li><code>?action=list&amp;format=html&amp;key=' . $key . '</code></li>
             <li><code>?action=run&amp;id=1&amp;format=html&amp;key=' . $key . '</code></li>
@@ -259,6 +260,28 @@ function renderListHtml(array $data): string {
         </table>
         <div class="actions">
             <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Help</a>
+        </div>';
+}
+
+function renderUpdateHtml(array $data): string {
+    if (!($data['success'] ?? false)) {
+        return '<h1>Update macro</h1><p><span class="badge badge-error">Error</span></p><p>' . h($data['error'] ?? 'Unknown error') . '</p>';
+    }
+
+    $macro = $data['macro'] ?? [];
+
+    return '<h1>Update macro</h1>
+        <p><span class="badge badge-success">Success</span></p>
+        <p>' . h($data['message'] ?? 'Macro updated') . '</p>
+        <table>
+            <tr><th>ID</th><td>' . h((string) ($macro['id'] ?? '')) . '</td></tr>
+            <tr><th>Name</th><td>' . h($macro['name'] ?? '') . '</td></tr>
+            <tr><th>Method</th><td>' . h($macro['method'] ?? '') . '</td></tr>
+            <tr><th>Target URL</th><td><code>' . h($macro['url'] ?? '') . '</code></td></tr>
+        </table>
+        <div class="actions">
+            <a href="?action=run&amp;id=' . h((string) ($macro['id'] ?? '')) . '&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Execute macro</a>
+            <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">All macros</a>
         </div>';
 }
 
@@ -622,6 +645,77 @@ if ($action === 'create') {
     }
 }
 
+if ($action === 'update') {
+    $id = (int) ($_GET['id'] ?? 0);
+    if ($id <= 0) {
+        respondError('id is required');
+    }
+
+    $hasUpdateField = isset($_GET['name']) || isset($_GET['url']) || isset($_GET['method']) || isset($_GET['body']) || isset($_GET['headers']);
+    if (!$hasUpdateField) {
+        respondError('At least one field to update is required (name, url, method, body, headers)');
+    }
+
+    try {
+        $stmt = $db->prepare('SELECT * FROM macros WHERE id = :id');
+        $stmt->bindValue(':id', $id);
+        $result = $stmt->execute();
+        $macro = $result->fetchArray(SQLITE3_ASSOC);
+
+        if (!$macro) {
+            respondError('Macro not found', 404);
+        }
+
+        $name = isset($_GET['name']) ? $_GET['name'] : $macro['name'];
+        $method = isset($_GET['method']) ? strtoupper($_GET['method']) : $macro['method'];
+        $url = isset($_GET['url']) ? $_GET['url'] : $macro['url'];
+        $body = isset($_GET['body']) ? $_GET['body'] : $macro['body'];
+        $headers = isset($_GET['headers']) ? $_GET['headers'] : $macro['headers'];
+
+        if ($name === '' || $url === '') {
+            respondError('name and url cannot be empty');
+        }
+
+        foreach ([validateMacroName($name), validateMethod($method), validateTargetUrl($url, $config), validateHeaders($headers)] as $validationError) {
+            if ($validationError !== null) {
+                respondError($validationError);
+            }
+        }
+
+        $stmt = $db->prepare('UPDATE macros SET name = :name, method = :method, url = :url, body = :body, headers = :headers WHERE id = :id');
+        $stmt->bindValue(':name', $name);
+        $stmt->bindValue(':method', $method);
+        $stmt->bindValue(':url', $url);
+        $stmt->bindValue(':body', $body);
+        $stmt->bindValue(':headers', $headers);
+        $stmt->bindValue(':id', $id);
+        $stmt->execute();
+
+        if ($db->changes() === 0) {
+            respondData(['error' => 'Macro not found'], 404, 'renderUpdateHtml');
+        }
+
+        respondData([
+            'success' => true,
+            'message' => "Macro $id updated",
+            'macro' => [
+                'id' => $id,
+                'name' => $name,
+                'method' => $method,
+                'url' => $url,
+                'body' => $body,
+                'headers' => $headers,
+            ],
+        ], 200, 'renderUpdateHtml');
+    } catch (Exception $e) {
+        if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+            respondData(['error' => 'Failed to update macro (name already exists?)'], 400, 'renderUpdateHtml');
+        }
+
+        respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderUpdateHtml');
+    }
+}
+
 if ($action === 'run') {
     $id = (int) ($_GET['id'] ?? 0);
     if ($id <= 0) {
@@ -709,13 +803,14 @@ if ($action === 'help' || !$action) {
         'message' => 'Macro Generator help',
         'endpoints' => [
             'create' => '?action=create&name=NAME&method=POST&url=...&body=...&headers=...&key=...',
+            'update' => '?action=update&id=123&name=NAME&url=...&method=POST&body=...&headers=...&key=...',
             'run' => '?action=run&id=123&key=...',
             'list' => '?action=list&key=...',
             'delete' => '?action=delete&id=123&key=...',
             'help' => '?action=help&key=...',
         ],
         'formats' => [
-            'json' => 'Default for create, run, list, and delete',
+            'json' => 'Default for create, update, run, list, and delete',
             'html' => 'Readable HTML output with format=html',
         ],
     ]);
