@@ -121,11 +121,13 @@ function isHtmlContent(mixed $content): bool {
     return $trimmed !== '' && $trimmed[0] === '<';
 }
 
-function renderHelpPage(string $apiKey): string {
-    $key = h($apiKey);
+function renderHelpPage(): string {
+    $key = 'YOUR_KEY';
+    $navKey = h($_GET['key'] ?? '');
 
     return '<h1>Macro Generator</h1>
         <p class="muted">GET-driven HTTP macro proxy for AI systems and automation.</p>
+        <p class="muted">Examples use the placeholder <code>YOUR_KEY</code>. Replace it with your configured API key.</p>
         <h2>GET endpoints</h2>
         <ul>
             <li><code>?action=create&amp;name=NAME&amp;method=POST&amp;url=...&amp;body=...&amp;headers=...&amp;key=' . $key . '</code> – Create macro</li>
@@ -147,7 +149,7 @@ function renderHelpPage(string $apiKey): string {
         <p><strong>Execute macro</strong><br>
         <code>?action=run&amp;id=1&amp;format=html&amp;key=' . $key . '</code></p>
         <div class="actions">
-            <a href="?action=list&amp;format=html&amp;key=' . $key . '">View macros</a>
+            <a href="?action=list&amp;format=html&amp;key=' . $navKey . '">View macros</a>
         </div>';
 }
 
@@ -579,7 +581,6 @@ auth($config);
 $db = initDB();
 checkRateLimit($db, $config);
 $action = $_GET['action'] ?? '';
-$apiKey = $config['apiKey'];
 
 if ($action === 'create') {
     $name = $_GET['name'] ?? '';
@@ -700,7 +701,7 @@ if ($action === 'delete') {
 
 if ($action === 'help' || !$action) {
     if (wantsHtml()) {
-        renderPage('Macro Generator', renderHelpPage($apiKey));
+        renderPage('Macro Generator', renderHelpPage());
     }
 
     respondJson([

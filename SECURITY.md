@@ -70,6 +70,7 @@ This project is a pragmatic bridge for GET-only environments, not a full API gat
 
 - Single global API key (no per-user auth)
 - GET parameters may be logged by web servers and proxies
+- The HTML help page uses the `YOUR_KEY` placeholder in examples and does not render the configured API key
 - Macro target responses are proxied as-is
 - SQLite is suitable for small workloads, not high-traffic multi-tenant production
 - Domain whitelist can be bypassed if DNS rebinding protections are misconfigured upstream
