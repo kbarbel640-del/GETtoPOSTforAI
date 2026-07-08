@@ -1,14 +1,14 @@
 <?php
 // ============================================================
-// MAKRO GENERATOR - GET-gesteuert, SQLite, cURL-Proxy
+// MACRO GENERATOR - GET-driven, SQLite, cURL proxy
 // ============================================================
 
-// ---------- Konfiguration ----------
+// ---------- Configuration ----------
 define('DB_FILE', __DIR__ . '/macro_generator.db');
 define('API_KEY_FILE', __DIR__ . '/api_key.php');
 define('ALLOWED_METHODS', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 
-// ---------- Ausgabeformat ----------
+// ---------- Output format ----------
 function wantsHtml(): bool {
     $format = strtolower($_GET['format'] ?? '');
     if ($format === 'html') {
@@ -37,7 +37,7 @@ function renderPage(string $title, string $body, int $status = 200): void {
     http_response_code($status);
     header('Content-Type: text/html; charset=utf-8');
     echo '<!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -70,14 +70,14 @@ function renderPage(string $title, string $body, int $status = 200): void {
 
 function respondError(string $message, int $status = 400): void {
     if (wantsHtml()) {
-        $body = '<h1>Makro Generator</h1>
-            <p><span class="badge badge-error">Fehler</span></p>
+        $body = '<h1>Macro Generator</h1>
+            <p><span class="badge badge-error">Error</span></p>
             <p>' . h($message) . '</p>
             <div class="actions">
-                <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Hilfe</a>
-                <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Makros anzeigen</a>
+                <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Help</a>
+                <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">View macros</a>
             </div>';
-        renderPage('Fehler', $body, $status);
+        renderPage('Error', $body, $status);
     }
 
     respondJson(['error' => $message], $status);
@@ -85,7 +85,7 @@ function respondError(string $message, int $status = 400): void {
 
 function respondData(array $data, int $status = 200, ?callable $htmlRenderer = null): void {
     if (wantsHtml()) {
-        $title = $data['success'] ?? false ? 'Erfolg' : 'Makro Generator';
+        $title = $data['success'] ?? false ? 'Success' : 'Macro Generator';
         $body = $htmlRenderer ? $htmlRenderer($data) : '<pre>' . h(json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</pre>';
         renderPage($title, $body, $status);
     }
@@ -124,53 +124,53 @@ function isHtmlContent(mixed $content): bool {
 function renderHelpPage(string $apiKey): string {
     $key = h($apiKey);
 
-    return '<h1>Makro Generator</h1>
-        <p class="muted">GET-gesteuerter HTTP-Makro-Proxy für KI-Systeme und Automatisierung.</p>
-        <h2>GET-Endpunkte</h2>
+    return '<h1>Macro Generator</h1>
+        <p class="muted">GET-driven HTTP macro proxy for AI systems and automation.</p>
+        <h2>GET endpoints</h2>
         <ul>
-            <li><code>?action=create&amp;name=NAME&amp;method=POST&amp;url=...&amp;body=...&amp;headers=...&amp;key=' . $key . '</code> – Makro anlegen</li>
-            <li><code>?action=run&amp;id=123&amp;key=' . $key . '</code> – Makro ausführen</li>
-            <li><code>?action=list&amp;key=' . $key . '</code> – Alle Makros anzeigen</li>
-            <li><code>?action=delete&amp;id=123&amp;key=' . $key . '</code> – Makro löschen</li>
-            <li><code>?action=help&amp;key=' . $key . '</code> – Diese Hilfeseite</li>
+            <li><code>?action=create&amp;name=NAME&amp;method=POST&amp;url=...&amp;body=...&amp;headers=...&amp;key=' . $key . '</code> – Create macro</li>
+            <li><code>?action=run&amp;id=123&amp;key=' . $key . '</code> – Execute macro</li>
+            <li><code>?action=list&amp;key=' . $key . '</code> – List macros</li>
+            <li><code>?action=delete&amp;id=123&amp;key=' . $key . '</code> – Delete macro</li>
+            <li><code>?action=help&amp;key=' . $key . '</code> – This help page</li>
         </ul>
-        <h2>Ausgabeformat</h2>
-        <p>Mit <code>format=html</code> liefern alle Aktionen eine lesbare HTML-Seite. Ohne Angabe antworten <code>create</code>, <code>run</code>, <code>list</code> und <code>delete</code> als JSON. <code>help</code> ist standardmäßig HTML.</p>
+        <h2>Output format</h2>
+        <p>With <code>format=html</code>, all actions return a readable HTML page. By default, <code>create</code>, <code>run</code>, <code>list</code>, and <code>delete</code> respond as JSON. <code>help</code> defaults to HTML.</p>
         <ul>
             <li><code>?action=list&amp;format=html&amp;key=' . $key . '</code></li>
             <li><code>?action=run&amp;id=1&amp;format=html&amp;key=' . $key . '</code></li>
             <li><code>?action=help&amp;format=json&amp;key=' . $key . '</code></li>
         </ul>
-        <h2>Beispiele</h2>
-        <p><strong>Makro anlegen</strong><br>
+        <h2>Examples</h2>
+        <p><strong>Create macro</strong><br>
         <code>?action=create&amp;name=test&amp;method=POST&amp;url=https://httpbin.org/post&amp;body={"foo":"bar"}&amp;key=' . $key . '</code></p>
-        <p><strong>Makro ausführen</strong><br>
+        <p><strong>Execute macro</strong><br>
         <code>?action=run&amp;id=1&amp;format=html&amp;key=' . $key . '</code></p>
         <div class="actions">
-            <a href="?action=list&amp;format=html&amp;key=' . $key . '">Makros anzeigen</a>
+            <a href="?action=list&amp;format=html&amp;key=' . $key . '">View macros</a>
         </div>';
 }
 
 function renderCreateHtml(array $data): string {
     if (!($data['success'] ?? false)) {
-        return '<h1>Makro anlegen</h1><p><span class="badge badge-error">Fehler</span></p><p>' . h($data['error'] ?? 'Unbekannter Fehler') . '</p>';
+        return '<h1>Create macro</h1><p><span class="badge badge-error">Error</span></p><p>' . h($data['error'] ?? 'Unknown error') . '</p>';
     }
 
-    return '<h1>Makro anlegen</h1>
-        <p><span class="badge badge-success">Erfolg</span></p>
-        <p>' . h($data['message'] ?? 'Makro angelegt') . '</p>
+    return '<h1>Create macro</h1>
+        <p><span class="badge badge-success">Success</span></p>
+        <p>' . h($data['message'] ?? 'Macro created') . '</p>
         <table>
             <tr><th>ID</th><td>' . h((string) ($data['id'] ?? '')) . '</td></tr>
         </table>
         <div class="actions">
-            <a href="?action=run&amp;id=' . h((string) ($data['id'] ?? '')) . '&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Makro ausführen</a>
-            <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Alle Makros</a>
+            <a href="?action=run&amp;id=' . h((string) ($data['id'] ?? '')) . '&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Execute macro</a>
+            <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">All macros</a>
         </div>';
 }
 
 function renderRunHtml(array $data): string {
     if (!($data['success'] ?? false)) {
-        return '<h1>Makro ausführen</h1><p><span class="badge badge-error">Fehler</span></p><p>' . h($data['error'] ?? 'Unbekannter Fehler') . '</p>';
+        return '<h1>Execute macro</h1><p><span class="badge badge-error">Error</span></p><p>' . h($data['error'] ?? 'Unknown error') . '</p>';
     }
 
     $response = $data['response'] ?? [];
@@ -178,26 +178,26 @@ function renderRunHtml(array $data): string {
     $payload = $response['response'] ?? ($response['error'] ?? null);
     $body = '';
 
-    $body .= '<h1>Makro ausführen</h1>
-        <p><span class="badge badge-success">Ausgeführt</span></p>
+    $body .= '<h1>Execute macro</h1>
+        <p><span class="badge badge-success">Executed</span></p>
         <table>
-            <tr><th>Makro</th><td>' . h($data['macro'] ?? '') . '</td></tr>
-            <tr><th>Methode</th><td>' . h($data['method'] ?? '') . '</td></tr>
-            <tr><th>Ziel-URL</th><td><code>' . h($data['target_url'] ?? '') . '</code></td></tr>
-            <tr><th>HTTP-Status</th><td>' . h($status) . '</td></tr>
+            <tr><th>Macro</th><td>' . h($data['macro'] ?? '') . '</td></tr>
+            <tr><th>Method</th><td>' . h($data['method'] ?? '') . '</td></tr>
+            <tr><th>Target URL</th><td><code>' . h($data['target_url'] ?? '') . '</code></td></tr>
+            <tr><th>HTTP status</th><td>' . h($status) . '</td></tr>
         </table>';
 
     if (isset($response['error'])) {
-        $body .= '<h2>Fehler</h2><pre>' . h((string) $response['error']) . '</pre>';
+        $body .= '<h2>Error</h2><pre>' . h((string) $response['error']) . '</pre>';
     } elseif ($payload !== null) {
         $formatted = formatResponseContent($payload);
-        $body .= '<h2>Antwort</h2>';
+        $body .= '<h2>Response</h2>';
 
         if (isHtmlContent($payload)) {
-            $body .= '<p class="muted">Die Ziel-API hat HTML geliefert. Vorschau unten, Quelltext im ausklappbaren Block.</p>
-                <iframe class="preview" sandbox="" srcdoc="' . h($formatted) . '" title="API-Antwort"></iframe>
+            $body .= '<p class="muted">The target API returned HTML. Preview below, source in the expandable block.</p>
+                <iframe class="preview" sandbox="" srcdoc="' . h($formatted) . '" title="API response"></iframe>
                 <details>
-                    <summary>HTML-Quelltext</summary>
+                    <summary>HTML source</summary>
                     <pre>' . h($formatted) . '</pre>
                 </details>';
         } else {
@@ -206,8 +206,8 @@ function renderRunHtml(array $data): string {
     }
 
     $body .= '<div class="actions">
-            <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Alle Makros</a>
-            <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Hilfe</a>
+            <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">All macros</a>
+            <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Help</a>
         </div>';
 
     return $body;
@@ -215,7 +215,7 @@ function renderRunHtml(array $data): string {
 
 function renderListHtml(array $data): string {
     if (isset($data['error'])) {
-        return '<h1>Makros</h1><p><span class="badge badge-error">Fehler</span></p><p>' . h($data['error']) . '</p>';
+        return '<h1>Macros</h1><p><span class="badge badge-error">Error</span></p><p>' . h($data['error']) . '</p>';
     }
 
     $macros = $data['macros'] ?? [];
@@ -229,55 +229,55 @@ function renderListHtml(array $data): string {
             <td><code>' . h($macro['url'] ?? '') . '</code></td>
             <td>' . h($macro['created_at'] ?? '') . '</td>
             <td>
-                <a href="?action=run&amp;id=' . h((string) ($macro['id'] ?? '')) . '&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Ausführen</a>
+                <a href="?action=run&amp;id=' . h((string) ($macro['id'] ?? '')) . '&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Run</a>
                 |
-                <a href="?action=delete&amp;id=' . h((string) ($macro['id'] ?? '')) . '&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Löschen</a>
+                <a href="?action=delete&amp;id=' . h((string) ($macro['id'] ?? '')) . '&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Delete</a>
             </td>
         </tr>';
     }
 
     if ($rows === '') {
-        $rows = '<tr><td colspan="6" class="muted">Keine Makros vorhanden.</td></tr>';
+        $rows = '<tr><td colspan="6" class="muted">No macros found.</td></tr>';
     }
 
-    return '<h1>Makros</h1>
-        <p><span class="badge badge-success">' . h((string) ($data['count'] ?? 0)) . ' Einträge</span></p>
+    return '<h1>Macros</h1>
+        <p><span class="badge badge-success">' . h((string) ($data['count'] ?? 0)) . ' entries</span></p>
         <table>
             <thead>
                 <tr>
                     <th>ID</th>
                     <th>Name</th>
-                    <th>Methode</th>
+                    <th>Method</th>
                     <th>URL</th>
-                    <th>Erstellt</th>
-                    <th>Aktionen</th>
+                    <th>Created</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>' . $rows . '</tbody>
         </table>
         <div class="actions">
-            <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Hilfe</a>
+            <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Help</a>
         </div>';
 }
 
 function renderDeleteHtml(array $data): string {
     if (!($data['success'] ?? false)) {
-        return '<h1>Makro löschen</h1><p><span class="badge badge-error">Fehler</span></p><p>' . h($data['error'] ?? 'Unbekannter Fehler') . '</p>';
+        return '<h1>Delete macro</h1><p><span class="badge badge-error">Error</span></p><p>' . h($data['error'] ?? 'Unknown error') . '</p>';
     }
 
-    return '<h1>Makro löschen</h1>
-        <p><span class="badge badge-success">Erfolg</span></p>
-        <p>' . h($data['message'] ?? 'Makro gelöscht') . '</p>
+    return '<h1>Delete macro</h1>
+        <p><span class="badge badge-success">Success</span></p>
+        <p>' . h($data['message'] ?? 'Macro deleted') . '</p>
         <div class="actions">
-            <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">Alle Makros</a>
-            <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Hilfe</a>
+            <a href="?action=list&amp;format=html&amp;key=' . h($_GET['key'] ?? '') . '">All macros</a>
+            <a href="?action=help&amp;key=' . h($_GET['key'] ?? '') . '">Help</a>
         </div>';
 }
 
-// ---------- Konfiguration laden ----------
+// ---------- Load configuration ----------
 function loadConfig(): array {
     if (!file_exists(API_KEY_FILE)) {
-        respondError('API-Key-Datei nicht gefunden', 500);
+        respondError('API key file not found', 500);
     }
 
     require API_KEY_FILE;
@@ -309,13 +309,13 @@ function enforceHttps(array $config): void {
         return;
     }
 
-    respondError('HTTPS ist erforderlich', 403);
+    respondError('HTTPS is required', 403);
 }
 
-// ---------- Validierung & SSRF-Schutz ----------
+// ---------- Validation & SSRF protection ----------
 function validateMacroName(string $name): ?string {
     if (!preg_match('/^[a-zA-Z0-9_-]{1,50}$/', $name)) {
-        return 'Ungültiger Makro-Name (erlaubt: a-z, A-Z, 0-9, _, -, max. 50 Zeichen)';
+        return 'Invalid macro name (allowed: a-z, A-Z, 0-9, _, -, max 50 characters)';
     }
 
     return null;
@@ -323,7 +323,7 @@ function validateMacroName(string $name): ?string {
 
 function validateMethod(string $method): ?string {
     if (!in_array(strtoupper($method), ALLOWED_METHODS, true)) {
-        return 'Ungültige HTTP-Methode';
+        return 'Invalid HTTP method';
     }
 
     return null;
@@ -336,12 +336,12 @@ function validateHeaders(string $headers): ?string {
 
     $decoded = json_decode($headers, true);
     if (!is_array($decoded)) {
-        return 'headers muss ein gültiges JSON-Objekt sein';
+        return 'headers must be a valid JSON object';
     }
 
     foreach ($decoded as $key => $value) {
         if (!is_string($key) || (!is_string($value) && !is_numeric($value))) {
-            return 'headers dürfen nur String-Schlüssel und String/Number-Werte enthalten';
+            return 'headers may only contain string keys and string/number values';
         }
     }
 
@@ -397,35 +397,35 @@ function isDomainAllowed(string $host, array $allowedDomains): bool {
 
 function validateTargetUrl(string $url, array $config): ?string {
     if (strlen($url) > 2048) {
-        return 'URL ist zu lang';
+        return 'URL is too long';
     }
 
     $parts = parse_url($url);
     if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
-        return 'Ungültige URL';
+        return 'Invalid URL';
     }
 
     $scheme = strtolower($parts['scheme']);
     if (!in_array($scheme, ['http', 'https'], true)) {
-        return 'Nur http/https URLs erlaubt';
+        return 'Only http/https URLs are allowed';
     }
 
     if ($config['requireHttps'] && $scheme !== 'https') {
-        return 'Nur HTTPS-URLs erlaubt';
+        return 'Only HTTPS URLs are allowed';
     }
 
     $host = strtolower($parts['host']);
     if (isBlockedHost($host)) {
-        return 'Ziel-Host nicht erlaubt';
+        return 'Target host is not allowed';
     }
 
     if (!isDomainAllowed($host, $config['allowedDomains'])) {
-        return 'Domain nicht in der Whitelist';
+        return 'Domain is not in the whitelist';
     }
 
     if (filter_var($host, FILTER_VALIDATE_IP)) {
         if (isBlockedIp($host)) {
-            return 'Ziel-IP nicht erlaubt';
+            return 'Target IP is not allowed';
         }
 
         return null;
@@ -433,12 +433,12 @@ function validateTargetUrl(string $url, array $config): ?string {
 
     $ips = @gethostbynamel($host) ?: [];
     if ($ips === []) {
-        return 'Ziel-Host konnte nicht aufgelöst werden';
+        return 'Target host could not be resolved';
     }
 
     foreach ($ips as $ip) {
         if (isBlockedIp($ip)) {
-            return 'Ziel-Host löst auf eine nicht erlaubte IP auf';
+            return 'Target host resolves to a disallowed IP address';
         }
     }
 
@@ -469,7 +469,7 @@ function checkRateLimit(SQLite3 $db, array $config): void {
     $count = (int) ($row['count'] ?? 0);
 
     if ($count >= $config['rateLimitPerMinute']) {
-        respondError('Rate-Limit überschritten. Bitte später erneut versuchen.', 429);
+        respondError('Rate limit exceeded. Please try again later.', 429);
     }
 
     if ($row) {
@@ -495,7 +495,7 @@ function logExecution(SQLite3 $db, int $macroId, string $macroName, ?int $httpSt
     $stmt->execute();
 }
 
-// ---------- SQLite initialisieren ----------
+// ---------- Initialize SQLite ----------
 function initDB() {
     try {
         $db = new SQLite3(DB_FILE);
@@ -520,18 +520,18 @@ function initDB() {
         )');
         return $db;
     } catch (Exception $e) {
-        respondError('Datenbankfehler: ' . $e->getMessage(), 500);
+        respondError('Database error: ' . $e->getMessage(), 500);
     }
 }
 
-// ---------- Authentifizierung ----------
+// ---------- Authentication ----------
 function auth(array $config): void {
     if ($config['apiKey'] === '' || !isset($_GET['key']) || !hash_equals($config['apiKey'], (string) $_GET['key'])) {
-        respondError('Ungültiger oder fehlender API-Key', 401);
+        respondError('Invalid or missing API key', 401);
     }
 }
 
-// ---------- cURL-Proxy für POST/GET/PUT/DELETE ----------
+// ---------- cURL proxy for POST/GET/PUT/DELETE ----------
 function executeMacro($macro) {
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $macro['url']);
@@ -572,7 +572,7 @@ function executeMacro($macro) {
     ];
 }
 
-// ---------- Hauptlogik ----------
+// ---------- Main logic ----------
 $config = loadConfig();
 enforceHttps($config);
 auth($config);
@@ -589,7 +589,7 @@ if ($action === 'create') {
     $headers = $_GET['headers'] ?? '{}';
 
     if (empty($name) || empty($url)) {
-        respondError('name und url sind erforderlich');
+        respondError('name and url are required');
     }
 
     foreach ([validateMacroName($name), validateMethod($method), validateTargetUrl($url, $config), validateHeaders($headers)] as $validationError) {
@@ -611,20 +611,20 @@ if ($action === 'create') {
             respondData([
                 'success' => true,
                 'id' => $db->lastInsertRowID(),
-                'message' => "Makro '$name' angelegt",
+                'message' => "Macro '$name' created",
             ], 200, 'renderCreateHtml');
         }
 
-        respondData(['error' => 'Fehler beim Anlegen (existiert schon?)'], 400, 'renderCreateHtml');
+        respondData(['error' => 'Failed to create macro (already exists?)'], 400, 'renderCreateHtml');
     } catch (Exception $e) {
-        respondData(['error' => 'Datenbankfehler: ' . $e->getMessage()], 500, 'renderCreateHtml');
+        respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderCreateHtml');
     }
 }
 
 if ($action === 'run') {
     $id = (int) ($_GET['id'] ?? 0);
     if ($id <= 0) {
-        respondError('id erforderlich');
+        respondError('id is required');
     }
 
     try {
@@ -634,7 +634,7 @@ if ($action === 'run') {
         $macro = $result->fetchArray(SQLITE3_ASSOC);
 
         if (!$macro) {
-            respondError('Makro nicht gefunden', 404);
+            respondError('Macro not found', 404);
         }
 
         $urlError = validateTargetUrl($macro['url'], $config);
@@ -662,7 +662,7 @@ if ($action === 'run') {
             'response' => $output,
         ], 200, 'renderRunHtml');
     } catch (Exception $e) {
-        respondData(['error' => 'Datenbankfehler: ' . $e->getMessage()], 500, 'renderRunHtml');
+        respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderRunHtml');
     }
 }
 
@@ -675,14 +675,14 @@ if ($action === 'list') {
         }
         respondData(['macros' => $macros, 'count' => count($macros)], 200, 'renderListHtml');
     } catch (Exception $e) {
-        respondData(['error' => 'Datenbankfehler: ' . $e->getMessage()], 500, 'renderListHtml');
+        respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderListHtml');
     }
 }
 
 if ($action === 'delete') {
     $id = (int) ($_GET['id'] ?? 0);
     if ($id <= 0) {
-        respondError('id erforderlich');
+        respondError('id is required');
     }
 
     try {
@@ -691,21 +691,21 @@ if ($action === 'delete') {
         $stmt->execute();
         respondData([
             'success' => true,
-            'message' => "Makro $id gelöscht",
+            'message' => "Macro $id deleted",
         ], 200, 'renderDeleteHtml');
     } catch (Exception $e) {
-        respondData(['error' => 'Datenbankfehler: ' . $e->getMessage()], 500, 'renderDeleteHtml');
+        respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderDeleteHtml');
     }
 }
 
 if ($action === 'help' || !$action) {
     if (wantsHtml()) {
-        renderPage('Makro Generator', renderHelpPage($apiKey));
+        renderPage('Macro Generator', renderHelpPage($apiKey));
     }
 
     respondJson([
         'success' => true,
-        'message' => 'Makro Generator Hilfe',
+        'message' => 'Macro Generator help',
         'endpoints' => [
             'create' => '?action=create&name=NAME&method=POST&url=...&body=...&headers=...&key=...',
             'run' => '?action=run&id=123&key=...',
@@ -714,10 +714,10 @@ if ($action === 'help' || !$action) {
             'help' => '?action=help&key=...',
         ],
         'formats' => [
-            'json' => 'Standard für create, run, list und delete',
-            'html' => 'Lesbare HTML-Ausgabe mit format=html',
+            'json' => 'Default for create, run, list, and delete',
+            'html' => 'Readable HTML output with format=html',
         ],
     ]);
 }
 
-respondError('Unbekannte Aktion. ?action=help für Hilfe.');
+respondError('Unknown action. Use ?action=help for help.');

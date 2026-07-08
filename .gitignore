@@ -1,15 +1,15 @@
-# API-Key (lokal anlegen, nicht committen)
+# API key (create locally, do not commit)
 api_key.php
 
-# SQLite-Datenbank (wird zur Laufzeit erzeugt)
+# SQLite database (created at runtime)
 macro_generator.db
 *.db
 
-# Umgebungsvariablen
+# Environment variables
 .env
 .env.*
 
-# Betriebssystem
+# Operating system
 .DS_Store
 Thumbs.db
 

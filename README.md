@@ -1,26 +1,26 @@
 # GETtoPOSTforAI
 
-GET-gesteuerter HTTP-Makro-Proxy für KI-Systeme und Automatisierung.
+GET-driven HTTP macro proxy for AI systems and automation.
 
-**Öffentliches Open-Source-Projekt** — leichtgewichtige Brücke für Umgebungen, die nur GET-Requests ausführen können (z. B. bestimmte KI-Agenten, einfache Webhooks oder Legacy-Tools).
+**Public open-source project** — a lightweight bridge for environments that can only execute GET requests (e.g. certain AI agents, simple webhooks, or legacy tools).
 
-Viele KI-Agenten können nur **GET-Requests** ausführen. Dieses Projekt speichert vordefinierte HTTP-Aufrufe (POST, PUT, DELETE usw.) als **Makros** in einer SQLite-Datenbank und löst sie über einfache GET-URLs aus.
+Many AI agents can only send **GET requests**. This project stores predefined HTTP calls (POST, PUT, DELETE, etc.) as **macros** in a SQLite database and triggers them through simple GET URLs.
 
-## Funktionsweise
+## How it works
 
 ```
-Client / KI-Agent (GET)  →  macro_generator.php  →  SQLite  →  cURL  →  Ziel-API
+Client / AI agent (GET)  →  macro_generator.php  →  SQLite  →  cURL  →  Target API
 ```
 
-1. Makro per GET anlegen (`action=create`)
-2. Makro per GET ausführen (`action=run`) — der Server führt den gespeicherten HTTP-Request aus
-3. Makros auflisten oder löschen
+1. Create a macro via GET (`action=create`)
+2. Execute a macro via GET (`action=run`) — the server performs the stored HTTP request
+3. List or delete macros
 
-## Voraussetzungen
+## Requirements
 
 - PHP 8.x
-- PHP-Erweiterungen: `curl`, `sqlite3`
-- Webserver (Apache, Nginx o.ä.) mit PHP-Unterstützung
+- PHP extensions: `curl`, `sqlite3`
+- Web server (Apache, Nginx, etc.) with PHP support
 
 ## Installation
 
@@ -29,121 +29,121 @@ git clone https://github.com/kbarbel640-del/GETtoPOSTforAI.git
 cd GETtoPOSTforAI
 ```
 
-Dateien in das Webroot-Verzeichnis legen (z. B. `/var/www/html/GETtoPOSTforAI/`).
+Copy the files into your web root (e.g. `/var/www/html/GETtoPOSTforAI/`).
 
-### Apache mit Reverse-Proxy
+### Apache with reverse proxy
 
-Wenn Apache Anfragen an ein Backend weiterleitet (z. B. `ProxyPass / http://localhost:8000/`), muss `/GETtoPOSTforAI/` davon ausgenommen werden, damit PHP direkt aus dem Webroot ausgeliefert wird:
+If Apache forwards requests to a backend (e.g. `ProxyPass / http://localhost:8000/`), `/GETtoPOSTforAI/` must be excluded so PHP is served directly from the document root:
 
 ```apache
 ProxyPass /GETtoPOSTforAI/ !
 ```
 
-Eine vollständige Snippet-Datei liegt unter `deploy/apache-proxy-snippet.conf`.
+A full snippet is available in `deploy/apache-proxy-snippet.conf`.
 
-Das Verzeichnis muss für den Webserver beschreibbar sein, damit SQLite `macro_generator.db` anlegen kann:
+The directory must be writable by the web server so SQLite can create `macro_generator.db`:
 
 ```bash
 chown www-data:www-data /var/www/html/GETtoPOSTforAI
 chmod 775 /var/www/html/GETtoPOSTforAI
 ```
 
-### API-Key einrichten
+### API key setup
 
-Die Datei `api_key.php` ist nicht im Repository enthalten. Aus der Vorlage anlegen:
+`api_key.php` is not included in the repository. Create it from the template:
 
 ```bash
 cp api_key.php.example api_key.php
 ```
 
-Dann den API-Key und die Sicherheitseinstellungen in `api_key.php` anpassen:
+Then configure the API key and security settings in `api_key.php`:
 
 ```php
-$apiKey = 'dein-sicherer-schluessel';
+$apiKey = 'your-secure-secret';
 $requireHttps = true;
 $allowedDomains = ['httpbin.org', 'api.example.com'];
 $rateLimitPerMinute = 60;
 ```
 
-| Einstellung | Beschreibung |
-|-------------|--------------|
-| `$requireHttps` | API-Aufrufe nur über HTTPS erlauben |
-| `$allowedDomains` | Whitelist für Ziel-URLs beim Anlegen und Ausführen von Makros |
-| `$rateLimitPerMinute` | Max. Requests pro IP und Minute (`0` = aus) |
+| Setting | Description |
+|---------|-------------|
+| `$requireHttps` | Allow API requests only over HTTPS |
+| `$allowedDomains` | Whitelist for target URLs when creating and running macros |
+| `$rateLimitPerMinute` | Max requests per IP per minute (`0` = disabled) |
 
-> **Hinweis:** `api_key.php` steht in der `.gitignore` und darf nicht ins Repository committed werden.
+> **Note:** `api_key.php` is listed in `.gitignore` and must never be committed.
 
-Die SQLite-Datenbank `macro_generator.db` wird beim ersten Aufruf automatisch erzeugt.
+The SQLite database `macro_generator.db` is created automatically on first use.
 
-## API-Endpunkte
+## API endpoints
 
-Alle Aktionen werden per **GET** mit dem Parameter `key` (API-Key) aufgerufen.
+All actions are called via **GET** with the `key` parameter (API key).
 
-| Aktion | Parameter | Beschreibung |
-|--------|-----------|--------------|
-| `create` | `name`, `url`, `method`, `body`, `headers`, `key` | Makro anlegen |
-| `run` | `id`, `key` | Makro ausführen |
-| `list` | `key` | Alle Makros auflisten |
-| `delete` | `id`, `key` | Makro löschen |
-| `help` | `key` | Hilfeseite |
+| Action | Parameters | Description |
+|--------|------------|-------------|
+| `create` | `name`, `url`, `method`, `body`, `headers`, `key` | Create a macro |
+| `run` | `id`, `key` | Execute a macro |
+| `list` | `key` | List all macros |
+| `delete` | `id`, `key` | Delete a macro |
+| `help` | `key` | Help page |
 
-### Ausgabeformat (`format`)
+### Output format (`format`)
 
-| Wert | Verhalten |
-|------|-----------|
-| `json` | JSON-Antwort mit `Content-Type: application/json` |
-| `html` | Lesbare HTML-Seite mit `Content-Type: text/html` |
-| *(nicht gesetzt)* | `create`, `run`, `list`, `delete` → JSON; `help` → HTML |
+| Value | Behavior |
+|-------|----------|
+| `json` | JSON response with `Content-Type: application/json` |
+| `html` | Readable HTML page with `Content-Type: text/html` |
+| *(not set)* | `create`, `run`, `list`, `delete` → JSON; `help` → HTML |
 
-Beispiele:
-
-```
-GET ?action=list&key=DEIN_KEY
-GET ?action=list&format=html&key=DEIN_KEY
-GET ?action=run&id=1&format=html&key=DEIN_KEY
-GET ?action=help&format=json&key=DEIN_KEY
-```
-
-Bei `action=run` mit `format=html`:
-
-- Metadaten des Makros werden als Tabelle dargestellt
-- JSON-Antworten der Ziel-API werden formatiert angezeigt
-- HTML-Antworten der Ziel-API werden in einer sandboxed Vorschau plus Quelltext-Block gerendert
-
-Fehlerantworten respektieren ebenfalls `format=html` oder `format=json`.
-
-### Makro anlegen
+Examples:
 
 ```
-GET ?action=create&name=test&method=POST&url=https://httpbin.org/post&body={"foo":"bar"}&key=DEIN_KEY
+GET ?action=list&key=YOUR_KEY
+GET ?action=list&format=html&key=YOUR_KEY
+GET ?action=run&id=1&format=html&key=YOUR_KEY
+GET ?action=help&format=json&key=YOUR_KEY
 ```
 
-| Parameter | Pflicht | Beschreibung |
-|-----------|---------|--------------|
-| `name` | ja | Eindeutiger Makro-Name |
-| `url` | ja | Ziel-URL |
-| `method` | nein | HTTP-Methode (Standard: `POST`) |
-| `body` | nein | Request-Body als JSON-String |
-| `headers` | nein | HTTP-Headers als JSON-String (Standard: `{}`) |
+For `action=run` with `format=html`:
 
-**Antwort (Erfolg):**
+- Macro metadata is shown in a table
+- JSON responses from the target API are formatted
+- HTML responses from the target API are rendered in a sandboxed preview plus a source block
+
+Error responses also respect `format=html` or `format=json`.
+
+### Create a macro
+
+```
+GET ?action=create&name=test&method=POST&url=https://httpbin.org/post&body={"foo":"bar"}&key=YOUR_KEY
+```
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `name` | yes | Unique macro name |
+| `url` | yes | Target URL |
+| `method` | no | HTTP method (default: `POST`) |
+| `body` | no | Request body as JSON string |
+| `headers` | no | HTTP headers as JSON string (default: `{}`) |
+
+**Response (success):**
 
 ```json
 {
   "success": true,
   "id": 1,
-  "message": "Makro 'test' angelegt"
+  "message": "Macro 'test' created"
 }
 ```
 
-### Makro ausführen
+### Execute a macro
 
 ```
-GET ?action=run&id=1&key=DEIN_KEY
-GET ?action=run&id=1&format=html&key=DEIN_KEY
+GET ?action=run&id=1&key=YOUR_KEY
+GET ?action=run&id=1&format=html&key=YOUR_KEY
 ```
 
-**Antwort (Erfolg, JSON):**
+**Response (success, JSON):**
 
 ```json
 {
@@ -158,15 +158,15 @@ GET ?action=run&id=1&format=html&key=DEIN_KEY
 }
 ```
 
-**Antwort (Erfolg, HTML):** HTML-Seite mit Makro-Details, HTTP-Status und formatiertem Antwortinhalt. Liefert die Ziel-API HTML, erscheint eine sandboxed Vorschau.
+**Response (success, HTML):** HTML page with macro details, HTTP status, and formatted response content. If the target API returns HTML, a sandboxed preview is shown.
 
-### Makros auflisten
+### List macros
 
 ```
-GET ?action=list&key=DEIN_KEY
+GET ?action=list&key=YOUR_KEY
 ```
 
-**Antwort:**
+**Response:**
 
 ```json
 {
@@ -183,92 +183,94 @@ GET ?action=list&key=DEIN_KEY
 }
 ```
 
-### Makro löschen
+### Delete a macro
 
 ```
-GET ?action=delete&id=1&key=DEIN_KEY
+GET ?action=delete&id=1&key=YOUR_KEY
 ```
 
-**Antwort:**
+**Response:**
 
 ```json
 {
   "success": true,
-  "message": "Makro 1 gelöscht"
+  "message": "Macro 1 deleted"
 }
 ```
 
-## Datenbankschema
+## Database schema
 
-Tabelle `macros` in `macro_generator.db`:
+Table `macros` in `macro_generator.db`:
 
-| Feld | Typ | Beschreibung |
-|------|-----|--------------|
-| `id` | INTEGER | Primärschlüssel (Auto-Increment) |
-| `name` | TEXT | Eindeutiger Makro-Name |
-| `method` | TEXT | HTTP-Methode |
-| `url` | TEXT | Ziel-URL |
-| `body` | TEXT | Request-Body |
-| `headers` | TEXT | HTTP-Headers (JSON) |
-| `created_at` | DATETIME | Erstellungszeitpunkt |
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | INTEGER | Primary key (auto-increment) |
+| `name` | TEXT | Unique macro name |
+| `method` | TEXT | HTTP method |
+| `url` | TEXT | Target URL |
+| `body` | TEXT | Request body |
+| `headers` | TEXT | HTTP headers (JSON) |
+| `created_at` | DATETIME | Creation timestamp |
 
-Tabelle `execution_log` (automatisch):
+Table `execution_log` (created automatically):
 
-| Feld | Typ | Beschreibung |
-|------|-----|--------------|
-| `macro_id` | INTEGER | Ausgeführtes Makro |
-| `macro_name` | TEXT | Makro-Name |
-| `ip` | TEXT | Client-IP |
-| `http_status` | INTEGER | HTTP-Status der Ziel-API |
-| `success` | INTEGER | `1` = erfolgreich, `0` = Fehler |
-| `error` | TEXT | Fehlermeldung (falls vorhanden) |
-| `executed_at` | DATETIME | Zeitpunkt der Ausführung |
+| Field | Type | Description |
+|-------|------|-------------|
+| `macro_id` | INTEGER | Executed macro |
+| `macro_name` | TEXT | Macro name |
+| `ip` | TEXT | Client IP |
+| `http_status` | INTEGER | Target API HTTP status |
+| `success` | INTEGER | `1` = success, `0` = error |
+| `error` | TEXT | Error message (if any) |
+| `executed_at` | DATETIME | Execution timestamp |
 
-## Projektstruktur
+## Project structure
 
 ```
 GETtoPOSTforAI/
-├── macro_generator.php          # Hauptanwendung (API + cURL-Proxy)
-├── api_key.php.example          # Vorlage für den API-Key
-├── api_key.php                  # API-Key (lokal, nicht im Repo)
-├── macro_generator.db           # SQLite-Datenbank (zur Laufzeit)
+├── macro_generator.php          # Main application (API + cURL proxy)
+├── api_key.php.example          # API key and security template
+├── api_key.php                  # Local config (not in repo)
+├── macro_generator.db           # SQLite database (runtime)
 ├── deploy/
 │   └── apache-proxy-snippet.conf
+├── LICENSE
+├── SECURITY.md
 ├── .gitignore
 └── README.md
 ```
 
-## Sicherheit (öffentliche Instanzen)
+## Security (public instances)
 
-Da das Repository öffentlich ist, enthält der Code **Baseline-Schutz** für öffentlich erreichbare Installationen:
+Because this repository is public, the code includes **baseline protection** for internet-facing deployments. See [SECURITY.md](SECURITY.md) for the full policy and vulnerability reporting process.
 
-| Maßnahme | Status |
-|----------|--------|
-| API-Key mit `hash_equals()` | ✅ |
-| HTTPS erzwingen (`$requireHttps`) | ✅ |
-| Domain-Whitelist (`$allowedDomains`) | ✅ |
-| SSRF-Schutz (localhost, private IPs, DNS-Check) | ✅ |
-| Input-Validierung (`name`, `method`, `headers`, `url`) | ✅ |
-| Rate-Limiting pro IP | ✅ |
-| Ausführungs-Log in SQLite | ✅ |
-| cURL ohne Redirect-Follow | ✅ |
+| Measure | Status |
+|---------|--------|
+| API key with `hash_equals()` | ✅ |
+| HTTPS enforcement (`$requireHttps`) | ✅ |
+| Domain whitelist (`$allowedDomains`) | ✅ |
+| SSRF protection (localhost, private IPs, DNS check) | ✅ |
+| Input validation (`name`, `method`, `headers`, `url`) | ✅ |
+| Per-IP rate limiting | ✅ |
+| Execution log in SQLite | ✅ |
+| cURL without redirect following | ✅ |
 
-### Empfehlungen für den Betrieb
+### Operational recommendations
 
-- **Starken API-Key** setzen und `api_key.php` niemals committen
-- **`$allowedDomains`** auf die wirklich benötigten APIs begrenzen
-- **HTTPS** aktiv lassen
-- **Server-Logs** beachten: GET-Parameter mit API-Key können in Access-Logs landen
-- **`macro_generator.db`** regelmäßig sichern (z. B. per Cronjob)
-- Instanz **nicht ungeschützt** ins Internet stellen, ohne Whitelist und Rate-Limit
+- Use a **strong API key** and never commit `api_key.php`
+- Restrict **`$allowedDomains`** to the APIs you actually need
+- Keep **HTTPS** enabled
+- Be aware of **server logs**: GET parameters may contain the API key
+- **Back up** `macro_generator.db` regularly (e.g. via cron)
+- Do **not** expose an unconfigured instance to the public internet
 
-### Typische Anwendungsfälle
+### Typical use cases
 
-- KI-Agenten ohne POST-Unterstützung
-- GET-only Webhooks als Brücke zu REST-APIs
-- Schnelles Testen und Mocken von APIs
-- Legacy-Systeme, die moderne HTTP-Methoden indirekt ansteuern
+- AI agents without POST support
+- GET-only webhooks as a bridge to REST APIs
+- Quick API testing and mocking
+- Legacy systems that need to reach modern HTTP methods indirectly
 
-## Lizenz
+## License
 
-Keine Lizenz angegeben.
+MIT — see [LICENSE](LICENSE).
