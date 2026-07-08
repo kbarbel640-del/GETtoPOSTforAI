@@ -125,8 +125,8 @@ GET ?action=create&name=test&method=POST&url=https://httpbin.org/post&body={"foo
 | `name` | yes | Unique macro name |
 | `url` | yes | Target URL |
 | `method` | no | HTTP method (default: `POST`) |
-| `body` | no | Request body as JSON string |
-| `headers` | no | HTTP headers as JSON string (default: `{}`) |
+| `body` | no | Request body as JSON string (max 64 KB) |
+| `headers` | no | HTTP headers as JSON string (default: `{}`, max 64 KB) |
 
 **Response (success):**
 

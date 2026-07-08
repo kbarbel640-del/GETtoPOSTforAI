@@ -7,6 +7,9 @@
 define('DB_FILE', __DIR__ . '/macro_generator.db');
 define('API_KEY_FILE', __DIR__ . '/api_key.php');
 define('ALLOWED_METHODS', ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
+define('MAX_URL_LENGTH', 2048);
+define('MAX_BODY_LENGTH', 65536);
+define('MAX_HEADERS_LENGTH', 65536);
 
 // ---------- Output format ----------
 function wantsHtml(): bool {
@@ -354,7 +357,19 @@ function validateMethod(string $method): ?string {
     return null;
 }
 
+function validateBody(string $body): ?string {
+    if (strlen($body) > MAX_BODY_LENGTH) {
+        return 'body is too long (max 64 KB)';
+    }
+
+    return null;
+}
+
 function validateHeaders(string $headers): ?string {
+    if (strlen($headers) > MAX_HEADERS_LENGTH) {
+        return 'headers are too long (max 64 KB)';
+    }
+
     if ($headers === '') {
         return null;
     }
@@ -421,7 +436,7 @@ function isDomainAllowed(string $host, array $allowedDomains): bool {
 }
 
 function validateTargetUrl(string $url, array $config): ?string {
-    if (strlen($url) > 2048) {
+    if (strlen($url) > MAX_URL_LENGTH) {
         return 'URL is too long';
     }
 
@@ -456,8 +471,8 @@ function validateTargetUrl(string $url, array $config): ?string {
         return null;
     }
 
-    $ips = @gethostbynamel($host) ?: [];
-    if ($ips === []) {
+    $ips = gethostbynamel($host);
+    if ($ips === false || $ips === []) {
         return 'Target host could not be resolved';
     }
 
@@ -485,7 +500,10 @@ function checkRateLimit(SQLite3 $db, array $config): void {
         PRIMARY KEY (ip, window_start)
     )');
 
-    $db->exec('DELETE FROM rate_limits WHERE window_start < ' . ($window - 2));
+    $cutoff = $window - 2;
+    $cleanup = $db->prepare('DELETE FROM rate_limits WHERE window_start < :cutoff');
+    $cleanup->bindValue(':cutoff', $cutoff, SQLITE3_INTEGER);
+    $cleanup->execute();
 
     $stmt = $db->prepare('SELECT count FROM rate_limits WHERE ip = :ip AND window_start = :window');
     $stmt->bindValue(':ip', $ip);
@@ -544,7 +562,7 @@ function initDB() {
             executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )');
         return $db;
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         respondError('Database error: ' . $e->getMessage(), 500);
     }
 }
@@ -616,7 +634,7 @@ if ($action === 'create') {
         respondError('name and url are required');
     }
 
-    foreach ([validateMacroName($name), validateMethod($method), validateTargetUrl($url, $config), validateHeaders($headers)] as $validationError) {
+    foreach ([validateMacroName($name), validateMethod($method), validateTargetUrl($url, $config), validateBody($body), validateHeaders($headers)] as $validationError) {
         if ($validationError !== null) {
             respondError($validationError);
         }
@@ -640,7 +658,7 @@ if ($action === 'create') {
         }
 
         respondData(['error' => 'Failed to create macro (already exists?)'], 400, 'renderCreateHtml');
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderCreateHtml');
     }
 }
@@ -676,7 +694,7 @@ if ($action === 'update') {
             respondError('name and url cannot be empty');
         }
 
-        foreach ([validateMacroName($name), validateMethod($method), validateTargetUrl($url, $config), validateHeaders($headers)] as $validationError) {
+        foreach ([validateMacroName($name), validateMethod($method), validateTargetUrl($url, $config), validateBody($body), validateHeaders($headers)] as $validationError) {
             if ($validationError !== null) {
                 respondError($validationError);
             }
@@ -707,7 +725,7 @@ if ($action === 'update') {
                 'headers' => $headers,
             ],
         ], 200, 'renderUpdateHtml');
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
             respondData(['error' => 'Failed to update macro (name already exists?)'], 400, 'renderUpdateHtml');
         }
@@ -756,7 +774,7 @@ if ($action === 'run') {
             'method' => $macro['method'],
             'response' => $output,
         ], 200, 'renderRunHtml');
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderRunHtml');
     }
 }
@@ -769,7 +787,7 @@ if ($action === 'list') {
             $macros[] = $row;
         }
         respondData(['macros' => $macros, 'count' => count($macros)], 200, 'renderListHtml');
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderListHtml');
     }
 }
@@ -788,7 +806,7 @@ if ($action === 'delete') {
             'success' => true,
             'message' => "Macro $id deleted",
         ], 200, 'renderDeleteHtml');
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
         respondData(['error' => 'Database error: ' . $e->getMessage()], 500, 'renderDeleteHtml');
     }
 }

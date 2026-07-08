@@ -74,5 +74,7 @@ This project is a pragmatic bridge for GET-only environments, not a full API gat
 - Macro target responses are proxied as-is
 - SQLite is suitable for small workloads, not high-traffic multi-tenant production
 - Domain whitelist can be bypassed if DNS rebinding protections are misconfigured upstream
+- DNS resolution uses PHP `gethostbynamel()` without a custom timeout
+- `body` and `headers` are limited to 64 KB each; very large GET URLs may still hit web server limits
 
 Contributions that improve safe defaults for public deployments are welcome.
